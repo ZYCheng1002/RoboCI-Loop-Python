@@ -20,7 +20,9 @@ from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 from sensor_msgs.msg import JointState, Image, CompressedImage
 from geometry_msgs.msg import PoseStamped
 from rcl_interfaces.srv import SetParametersAtomically
-from record_history import read_history, validate_metadata, delete_history_record
+from record_history import (
+    delete_history_record, discard_history_record, read_history, validate_metadata,
+)
 
 from roboci_loop.common import ARM_DATA, END_EFFECTOR_DATA, JOINT_DATA, ROBOT_DATA
 from roboci_loop.controller import ControlMode, DeviceControlConfig, RobotController, RobotControllerConfig
@@ -198,7 +200,7 @@ class PicoRos2(Node):
         self.recorder = McapRecord(output_dir)
         self.lock = threading.RLock()
         self.ready = False
-        self.preview = {}
+        self.preview = {}                           # 相机预览图像
         self.preview_times = {}
         self.samples_input = deque(maxlen=180)
         self.samples = {}
@@ -206,17 +208,17 @@ class PicoRos2(Node):
         self.completed = None
         self.review = None
         self.targets = {}
-        self.publishers_by_topic = {}
-        self.topic_types = {}
+        self.publishers_by_topic = {}               # 存储所有的publisher
+        self.topic_types = {}                       # 存储所有的topic数据类型
         self.config = config
         recording = config.get('recording', {})
         self.rgb_jpeg_quality = int(recording.get('rgb_jpeg_quality', 85))
         if not 1 <= self.rgb_jpeg_quality <= 100:
             raise ValueError('recording.rgb_jpeg_quality 必须在 1–100 之间')
         preview = config.get('preview', {})
-        self.preview_main_camera = str(preview.get('main_camera', 'base'))
-        self.preview_main_width = int(preview.get('main_width', 640))
-        self.preview_secondary_width = int(preview.get('secondary_width', 320))
+        self.preview_main_camera = str(preview.get('main_camera', 'base'))          # 预览的主相机设备
+        self.preview_main_width = int(preview.get('main_width', 640))               # 相机画面预览主相机尺寸
+        self.preview_secondary_width = int(preview.get('secondary_width', 320))     # 相机画面预览其余相机尺寸
         self.preview_jpeg_quality = int(preview.get('jpeg_quality', 90))
         if self.preview_main_camera not in config['cameras']:
             raise ValueError('preview.main_camera 必须是已配置的相机')
@@ -226,17 +228,20 @@ class PicoRos2(Node):
             raise ValueError('preview.jpeg_quality 必须在 1–100 之间')
         self.target_qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
                                      durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        # 初始化topic
         for kind in ('state', 'target'):
             for group, specs in (('arms', config['arms']), ('hands', config['end_effectors'])):
                 for name in specs:
                     self.add_topic(f'{kind}/{group}/{name}/joint_states', JointState, 'sensor_msgs/msg/JointState', kind)
                     if group == 'arms':
                         self.add_topic(f'{kind}/{group}/{name}/end_pose', PoseStamped, 'geometry_msgs/msg/PoseStamped', kind)
+        # 初始化相机相关的topic
         for name, spec in config['cameras'].items():
             self.add_topic(f'cameras/{name}/rgb/image_compressed', CompressedImage,
                            'sensor_msgs/msg/CompressedImage')
             if spec.get('config', {}).get('enable_depth', False):
                 self.add_topic(f'cameras/{name}/depth/image_raw', Image, 'sensor_msgs/msg/Image')
+        # 初始化service
         self.create_service(SetParametersAtomically, f'{self.prefix}/dashboard', self.dashboard)
 
     def add_topic(self, suffix, cls, type_name, kind='state'):
@@ -283,9 +288,11 @@ class PicoRos2(Node):
         return {'ok': True, 'message': '录制已保存，请提交质检', 'bag_directory': str(self.completed)}
 
     def status(self):
+        # 系统状态检查
         self.recorder.check_error()
         now = time.monotonic()
         devices = {}
+        # 计算相关fps
         for topic, samples in {**self.samples, 'PICO': self.samples_input}.items():
             if '/target/' in topic or '/end_pose' in topic:
                 continue
@@ -300,6 +307,7 @@ class PicoRos2(Node):
                 'bag_directory': str(self.recorder.path or '')}
 
     def dashboard(self, request, response):
+        """web交互"""
         # A single atomic request carries the action and JSON payload, without a custom ROS package.
         with self.lock:
             try:
@@ -325,9 +333,19 @@ class PicoRos2(Node):
                         raise ValueError('质检状态无效')
                     review = {key: str(payload.get(key, '')) for key in ('status', 'reason', 'note')}
                     review['reviewed_at'] = datetime.now().astimezone().isoformat()
-                    (self.completed / 'review.json').write_text(json.dumps(review, ensure_ascii=False, indent=2))
+                    (self.completed / 'review.json').write_text(
+                        json.dumps(review, ensure_ascii=False, indent=2), encoding='utf-8'
+                    )
+                    if review['status'] == 'rejected':
+                        self.completed = discard_history_record(
+                            self.recorder.output_dir, self.completed, active
+                        )
+                        message = '数据已移入当前 Task 的 .trash 目录'
+                    else:
+                        message = '质检已保存'
                     self.review = review
-                    result = {'ok': True, 'message': '质检已保存'}
+                    result = {'ok': True, 'message': message,
+                              'bag_directory': str(self.completed)}
                 elif action == 'delete':
                     deleted = delete_history_record(self.recorder.output_dir, payload.get('directory'), active)
                     if deleted == self.completed:
@@ -373,6 +391,8 @@ class PicoRos2(Node):
                     self.emit(f'{kind}/{group}/{name}/end_pose', msg, kind == 'target')
 
     def camera(self, frame):
+        """相机图像处理和发布"""
+        # 先完成相机预览图像红处理
         if frame.rgb is not None and frame.rgb.size:
             now = time.monotonic()
             key = f'preview/{frame.camera_name}'
@@ -396,6 +416,7 @@ class PicoRos2(Node):
                 with self.lock:
                     self.preview[frame.camera_name] = encoded
                 self.preview_times[key] = now
+        # 相机落盘数据处理
         for channel, values, encoding in (
                 ('rgb', frame.rgb, 'rgb8'), ('depth', frame.depth, '32FC1')):
             if values is None or not values.size:
@@ -413,8 +434,10 @@ class PicoRos2(Node):
                 msg.format = 'jpeg'
                 msg.data = b''.join(bytes(packet) for packet in
                                     [*codec.encode(image), *codec.encode(None)])
+                # 记录数据
                 self.emit(f'cameras/{frame.camera_name}/rgb/image_compressed', msg)
                 continue
+            # 深度图
             values = np.ascontiguousarray(values, dtype=np.dtype('<f4'))
             msg = Image()
             stamp(msg.header, frame.time_stamp, f'{frame.camera_name}_optical_frame')
@@ -432,12 +455,14 @@ def run(config, output_dir, prefix):
         stack.callback(node.destroy_node)
         stack.callback(node.recorder.stop)
         arms, hands, sides, threads = {}, {}, {}, []
+        # 初始化控制器
         for builder, specs, devices in ((build_end_effector, config['end_effectors'], hands),
                                         (build_arm, config['arms'], arms)):
             for name, spec in specs.items():
                 device = builder(name, spec)
                 stack.callback(device.stop)
                 if isinstance(device, HandLG603):
+                    # LG603 两只灵巧手共用一个CAN, 需要先解决通信问题
                     device.start(background_read=False)
                 else:
                     device.start()
@@ -447,6 +472,7 @@ def run(config, output_dir, prefix):
                 for hand in hands.values():
                     if isinstance(hand, HandLG603):
                         hand.start_feedback()
+        # 初始化PICO
         pico = build_controller('pico', config['controllers']['pico'])
         stack.callback(pico.stop)
         pico.start()
@@ -459,8 +485,10 @@ def run(config, output_dir, prefix):
                 end_effector=DeviceControlConfig(control_hz=settings['hand_control_hz'])))
             stack.callback(control.stop)
             control.start()
+            # 主要用于求逆解
             teleop = PoseTeleop(build_ik(config['kinematics'][name]), reference_joints=home,
                 config=PoseTeleopConfig(control_dt=1/hz, **settings['pose']))
+            # 单边控制
             side = SideControl(name, control, teleop, hands[name], home, settings)
             sides[name] = side
             events = RobotEvents(control.latest_state())
@@ -493,6 +521,7 @@ def run(config, output_dir, prefix):
                 thread.join()
         camera_stack = stack.enter_context(ExitStack())
         stack.callback(join_workers)
+        # 打开所有的相机线程
         for name, spec in config['cameras'].items():
             camera = build_camera(name, spec)
             camera_stack.callback(camera.stop)

@@ -45,7 +45,7 @@ python3 apps/pico_rm65_teleop/web.py
 ~/datasets/<Task>/<时间戳>/
 ```
 
-每次记录包含 MCAP、rosbag2 元数据、配置快照和质检结果。可通过 `teleop.py --output-dir` 修改根目录。废弃只添加标记，删除操作会永久移除数据。
+每次记录包含 MCAP、rosbag2 元数据、配置快照和质检结果。可通过 `teleop.py --output-dir` 修改根目录。选择“废弃”会将记录移动到对应 Task 的 .trash/ 目录；历史页面的删除操作会永久移除正常记录。
 
 所有实际收到的相机帧都会录制；页面预览频率和尺寸不会改变原始采集频率。JPEG 质量由 `recording.rgb_jpeg_quality` 配置。
 

@@ -118,6 +118,40 @@ def read_history(root: Path, active_directory: Path | None = None) -> dict:
     return {'records': records}
 
 
+def discard_history_record(
+    root: Path, directory: object, active_directory: Path | None = None
+) -> Path:
+    """将 Task 下已完成的记录移动到该 Task 的 .trash 目录。"""
+    if not isinstance(directory, (str, Path)) or not str(directory):
+        raise ValueError("没有可废弃的历史记录")
+    target = Path(directory)
+    resolved_root = root.resolve()
+    records = read_history(root, active_directory)["records"]
+    listed = {Path(record["directory"]).resolve() for record in records}
+    resolved_target = target.resolve()
+    if resolved_target not in listed:
+        raise ValueError("记录不存在或正在录制，请刷新历史列表")
+    try:
+        relative = resolved_target.relative_to(resolved_root)
+    except ValueError as exc:
+        raise ValueError("记录必须位于采集目录内") from exc
+    if len(relative.parts) != 2:
+        raise ValueError("只有 Task 目录下的记录可以移入废弃目录")
+    if active_directory is not None and resolved_target == active_directory.resolve():
+        raise ValueError("不能废弃正在录制的记录")
+
+    task_directory = resolved_target.parent
+    trash_directory = task_directory / ".trash"
+    if trash_directory.is_symlink():
+        raise ValueError("废弃目录不能是符号链接")
+    trash_directory.mkdir(exist_ok=True)
+    destination = trash_directory / resolved_target.name
+    if destination.exists() or destination.is_symlink():
+        raise FileExistsError(f"废弃目录中已存在同名记录：{destination.name}")
+    resolved_target.rename(destination)
+    return destination
+
+
 def delete_history_record(
     root: Path, directory: object, active_directory: Path | None = None
 ) -> Path:
