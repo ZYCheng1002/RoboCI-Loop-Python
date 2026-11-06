@@ -1,0 +1,79 @@
+<mujoco model="RM65-B">
+  <compiler angle="radian" meshdir="meshes" autolimits="true"/>
+
+  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast"/>
+
+  <default>
+    <joint limited="true" damping="0.2" armature="0.01" frictionloss="0.05"/>
+    <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="0.72 0.76 0.82 1"/>
+    <position kp="300" kv="30"/>
+  </default>
+
+  <asset>
+    <mesh name="base_link_mesh" file="base_link.STL"/>
+    <mesh name="link_1_mesh" file="link_1.STL"/>
+    <mesh name="link_2_mesh" file="link_2.STL"/>
+    <mesh name="link_3_mesh" file="link_3.STL"/>
+    <mesh name="link_4_mesh" file="link_4.STL"/>
+    <mesh name="link_5_mesh" file="link_5.STL"/>
+    <mesh name="link_6_mesh" file="link_6.STL"/>
+  </asset>
+
+  <worldbody>
+    <body name="base_link">
+      <geom mesh="base_link_mesh"/>
+      <body name="link_1" pos="0 0 0.2405">
+        <inertial pos="0.000941 0.007803 -0.10744" quat="0.997511 -0.0583785 0.00606547 -0.0390687"
+          mass="1.51" diaginertia="0.00266445 0.00233888 0.00165429"/>
+        <joint name="joint_1" axis="0 0 1" range="-3.106 3.106" actuatorfrcrange="-60 60"/>
+        <geom mesh="link_1_mesh"/>
+        <body name="link_2" quat="0.499998 0.5 -0.5 0.500002">
+          <inertial pos="0.183722 0.000103 -0.001665" quat="0.457963 0.540039 0.527633 0.469288"
+            mass="1.653" diaginertia="0.0147139 0.0144956 0.00145099"/>
+          <joint name="joint_2" axis="0 0 1" range="-2.2689 2.2689" actuatorfrcrange="-60 60"/>
+          <geom mesh="link_2_mesh"/>
+          <body name="link_3" pos="0.256 0 0" quat="0.707105 0 0 0.707108">
+            <inertial pos="0.000029 -0.090105 0.004039" quat="0.440332 0.546035 -0.554361 0.447925"
+              mass="0.726" diaginertia="0.00137906 0.00135087 0.000312565"/>
+            <joint name="joint_3" axis="0 0 1" range="-2.356 2.356" actuatorfrcrange="-30 30"/>
+            <geom mesh="link_3_mesh"/>
+            <body name="link_4" pos="0 -0.21 0" quat="0.707105 0.707108 0 0">
+              <inertial pos="0.000007 -0.009486 -0.008041" quat="0.997996 0.0631732 0.00130193 -0.00341789"
+                mass="0.671" diaginertia="0.000690229 0.000554914 0.000423747"/>
+              <joint name="joint_4" axis="0 0 1" range="-3.106 3.106" actuatorfrcrange="-10 10"/>
+              <geom mesh="link_4_mesh"/>
+              <body name="link_5" quat="0.707105 -0.707108 0 0">
+                <inertial pos="0.000032 -0.083769 0.002326" quat="0.438163 0.534713 -0.558183 0.458833"
+                  mass="0.647" diaginertia="0.000843948 0.000834034 0.000259551"/>
+                <joint name="joint_5" axis="0 0 1" range="-2.234 2.234" actuatorfrcrange="-10 10"/>
+                <geom mesh="link_5_mesh"/>
+                <body name="link_6" pos="0 -0.144 0" quat="0.707105 0.707108 0 0">
+                  <inertial pos="-0.000569 0.00029 -0.010569" quat="0.000385102 0.70742 0.0000561484 0.706793"
+                    mass="0.104" diaginertia="0.0000552 0.00003604 0.00003043"/>
+                  <joint name="joint_6" axis="0 0 1" range="-6.28 6.28" actuatorfrcrange="-10 10"/>
+                  <geom mesh="link_6_mesh"/>
+                  <site name="tool_site" pos="0 0 0" size="0.012" rgba="0.1 0.8 1 1"/>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <position name="joint_1" joint="joint_1" forcerange="-60 60" ctrlrange="-3.106 3.106"/>
+    <position name="joint_2" joint="joint_2" forcerange="-60 60" ctrlrange="-2.2689 2.2689"/>
+    <position name="joint_3" joint="joint_3" forcerange="-30 30" ctrlrange="-2.356 2.356"/>
+    <position name="joint_4" joint="joint_4" forcerange="-10 10" ctrlrange="-3.106 3.106"/>
+    <position name="joint_5" joint="joint_5" forcerange="-10 10" ctrlrange="-2.234 2.234"/>
+    <position name="joint_6" joint="joint_6" forcerange="-10 10" ctrlrange="-6.28 6.28"/>
+  </actuator>
+
+  <keyframe>
+    <!-- [0, -20, -70, 0, -90, 0] degrees: forward, tool-down pose for tabletop work. -->
+    <key name="home" qpos="0 -0.349065850399 -1.2217304764 0 -1.57079632679 0"
+      ctrl="0 -0.349065850399 -1.2217304764 0 -1.57079632679 0"/>
+  </keyframe>
+</mujoco>

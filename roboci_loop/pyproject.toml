@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "roboci-loop"
+version = "0.1.0"
+description = "Collection, inference, and human correction for dexterous manipulation"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.23",
+    "loguru>=0.7",
+    "av>=12",                   # 后台视频编码
+    "pyorbbecsdk2",             # 奥比中光相机 SDK
+    "Robotic_Arm",              # realman 机械臂SDK
+    "xrobotoolkit-sdk",         # PICO SDK
+    "placo==0.10.2"             # IK库
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["roboci_loop", "roboci_loop.*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+roboci_loop = [
+    "models/**/*.urdf",
+    "models/**/*.xml",
+    "models/**/*.STL",
+]

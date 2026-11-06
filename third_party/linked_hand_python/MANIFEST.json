@@ -1,0 +1,24 @@
+{
+  "sdk_version": "1.1.28 + local GCAN fixes",
+  "platform": "Linux x86_64",
+  "built_from": {
+    "3rdparty/linked_hand-1.1.28/src/transports/gcan_transport.cpp": "490d3c87d6228383b041f24a3a0d02d160f684147031e2598ae53a5737c059be",
+    "3rdparty/linked_hand-1.1.28/bindings/python/linked_hand.py": "dfec5445dff24c7727c0724c16e82857de1ade06c385fc02963aa77dfb3af178"
+  },
+  "sha256": {
+    "README.md": "37ce49ef02936d246977198d0206fdfa593db848fdd215ba7dbe545d4d795942",
+    "THIRD_PARTY_NOTICES.md": "73c2229830b29238d820ea2faa2c5e229b006d14ee8070faa90c9820e37bfc15",
+    "examples/benchmark.py": "31ed3135e0df6d5d59d6428cd790e0913b12c10451ceff7db3d4b3655b54c20c",
+    "lib/liblinked_hand.so": "05df7f2aead830823fe54d16c1ef49260eaf7f414765cafea4f60e10d940b8d6",
+    "lib/liblinked_hand.so.1": "05df7f2aead830823fe54d16c1ef49260eaf7f414765cafea4f60e10d940b8d6",
+    "lib/liblinked_hand.so.1.1.28": "05df7f2aead830823fe54d16c1ef49260eaf7f414765cafea4f60e10d940b8d6",
+    "linked_hand.py": "51f6b40e118caf9e8cf3853eb090b0e4bd8c5a72e721cdece784ee3b99633fef",
+    "udev/99-linked-hand-gcan.rules": "7b2ef1be8fcc6f3f8ee0d632c71050d771347b9c6724e68a7a8b056bc26f20dc",
+    "vendor/libECanVci.so": "f304823509aab1bf5604ad5a1dc18cb34d9e087e9702857866d452f2c448ed6a",
+    "vendor/libECanVci.so.1": "f304823509aab1bf5604ad5a1dc18cb34d9e087e9702857866d452f2c448ed6a",
+    "vendor/libusb-0.1.so.4": "f317bf6f1af6e527567ff0138cb85d76305daf9f7f4148c7d71aeac4915a2173",
+    "vendor/libusb-1.0.so": "664b7e4b040c18785412b051da4e237c44f2bdd520d08313cdb5723ce0e6c426",
+    "vendor/libusb-1.0.so.0": "664b7e4b040c18785412b051da4e237c44f2bdd520d08313cdb5723ce0e6c426",
+    "vendor/libusb.so": "f317bf6f1af6e527567ff0138cb85d76305daf9f7f4148c7d71aeac4915a2173"
+  }
+}

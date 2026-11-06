@@ -1,0 +1,4 @@
+# linked_hand / GCAN USBCAN-II C+
+# GCAN adapter VID:PID 0c66:000c
+# Allow normal users to access this dedicated USB-CAN adapter without sudo.
+SUBSYSTEM=="usb", ATTR{idVendor}=="0c66", ATTR{idProduct}=="000c", MODE="0666"
