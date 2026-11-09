@@ -556,6 +556,7 @@ def run(config, output_dir, prefix):
                     node.samples_input.append(started)
                 last_input = started
             for side in sides.values():
+                side.controller.check_error()
                 target = side.update(tracker, started, last_input, side.controller.read())
                 side.publish_target(target)
             stop.wait(max(0., 1/hz - (time.monotonic() - started)))

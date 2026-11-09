@@ -75,6 +75,8 @@ class RobotController:
         self._feedback = {}                                         # 各设备最新反馈消息
         self._init_done = set()                                     # 当前初始化中已到位的设备索引
         self._feedback_callback = None
+        self._error = None                                          # 首个设备控制线程异常
+        self._inactive_mode_error_logged = False                    # 避免停止后高频调用刷屏
 
     def set_feedback_callback(self, callback) -> None:
         """注册新反馈回调 (ROBOT_DATA)，在设备线程执行；回调不得阻塞或调用 stop。"""
@@ -116,6 +118,7 @@ class RobotController:
                     raise RuntimeError("等待设备首次反馈失败或超时")
                 # 设置启动
                 self._ready.set()
+                self._inactive_mode_error_logged = False
         except BaseException:
             self.stop()
             raise
@@ -127,7 +130,9 @@ class RobotController:
             return False
         with self._condition:
             if not self._ready.is_set() or self._stop.is_set():
-                logger.error("controller 尚未启动或已经停止")
+                if not self._inactive_mode_error_logged:
+                    logger.error("controller 尚未启动或已经停止")
+                    self._inactive_mode_error_logged = True
                 return False
             if self._mode == ControlMode.INIT:
                 logger.warning("初始化中, 禁止切换")
@@ -139,6 +144,13 @@ class RobotController:
                 self._init_done = set()
                 self._condition.notify_all()
             return True
+
+    def check_error(self) -> None:
+        """若设备控制线程已经失败，在调用线程中重新抛出并保留原始异常。"""
+        with self._condition:
+            error = self._error
+        if error is not None:
+            raise RuntimeError("设备控制线程失败") from error
 
     def _submit(self, data, mode):
         with self._condition:
@@ -332,9 +344,11 @@ class RobotController:
                         )
                 deadline = max(deadline + period, time.monotonic())
                 self._stop.wait(max(0, deadline - time.monotonic()))
-        except Exception:
+        except Exception as exc:
             logger.exception("{} 设备控制线程失败", key)
             with self._condition:
+                if self._error is None:
+                    self._error = exc
                 self._mode = ControlMode.HOLD
                 self._reset_devices.update(self._devices)
                 self._targets = {}
