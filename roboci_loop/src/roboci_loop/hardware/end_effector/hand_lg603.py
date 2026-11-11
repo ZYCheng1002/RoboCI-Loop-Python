@@ -225,11 +225,15 @@ class HandLG603(EndEffectorBase):
                 self._record_error(exc)
                 raise
 
-    def stop(self) -> None:
+    def stop_feedback(self) -> None:
+        """停止并等待反馈线程；用于多设备按依赖顺序关闭，不关闭 CAN 句柄。"""
         self._stop_reading.set()
         if self._reader is not None:
             self._reader.join()
             self._reader = None
+
+    def stop(self) -> None:
+        self.stop_feedback()
         if self._hand is not None:
             self._hand.close()
             self._hand = None
