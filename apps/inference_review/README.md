@@ -11,11 +11,11 @@
 ```bash
 source .venv/bin/activate
 python3 apps/inference_review/inference_review.py \
-  --server ws://192.168.2.15:8000 \
-  --prompt "Place the wire harness into the white tray, avoiding obstacles."
+  --config configs/inference_review_config.py
 ```
 
-默认读取 `configs/record_pico.py`。使用 `--skip-home` 可保持当前姿态开始推理。
+默认读取 `configs/inference_review_config.py`。OpenPI 服务、prompt、broker、
+推理频率、观测超时和是否回初始姿态均在其 `inference` 段配置。
 
 ## 接管与手柄操作
 

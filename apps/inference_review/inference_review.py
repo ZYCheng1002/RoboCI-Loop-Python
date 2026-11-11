@@ -29,7 +29,9 @@ from roboci_loop.inference import InferenceLayout, JointGroup, OpenPIConfig, Ope
 from roboci_loop.teleop import PoseTeleop, PoseTeleopConfig
 
 
-DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "configs" / "record_pico.py"
+DEFAULT_CONFIG = (
+    Path(__file__).resolve().parents[2] / "configs" / "inference_review_config.py"
+)
 CAMERA_KEYS = {
     "observation/image": "base",
     "observation/left_wrist_image": "left_wrist",
@@ -269,12 +271,12 @@ class SideControl:
 class InferenceWorker:
     """后台执行可能阻塞的模型请求；人工接管后丢弃未完成结果。"""
 
-    def __init__(self, policy, layout, controllers, collector, args) -> None:
+    def __init__(self, policy, layout, controllers, collector, settings) -> None:
         self.policy = policy
         self.layout = layout
         self.controllers = controllers
         self.collector = collector
-        self.args = args
+        self.settings = settings
         self.results = queue.Queue(maxsize=1)
         self.errors = queue.Queue(maxsize=1)
         self.stop_event = threading.Event()
@@ -284,7 +286,7 @@ class InferenceWorker:
         self.thread.start()
 
     def _run(self) -> None:
-        period = 1.0 / self.args.control_hz
+        period = 1.0 / self.settings["control_hz"]
         try:
             while not self.stop_event.is_set():
                 started = time.monotonic()
@@ -295,11 +297,11 @@ class InferenceWorker:
                     robot.arms.extend(state.arms)
                     robot.end_effectors.extend(state.end_effectors)
                 cameras = self.collector.snapshot(
-                    max_age=self.args.max_observation_age,
-                    max_skew=self.args.max_camera_skew,
+                    max_age=self.settings["max_observation_age"],
+                    max_skew=self.settings["max_camera_skew"],
                 )
                 action = self.policy.infer(
-                    self.layout.observation(robot, cameras, self.args.prompt)
+                    self.layout.observation(robot, cameras, self.settings["prompt"])
                 )
                 if self.stop_event.is_set():
                     break
@@ -348,9 +350,9 @@ def takeover_requested(tracker, threshold: float) -> bool:
     )
 
 
-def run(args) -> None:
-    config = runpy.run_path(str(args.config.expanduser().resolve()))["CONFIG"]
+def run(config) -> None:
     settings = config["teleop"]
+    inference = config["inference"]
     layout = InferenceLayout((
         JointGroup("arm", "left", 6),
         JointGroup("end_effector", "left", 6),
@@ -358,9 +360,10 @@ def run(args) -> None:
         JointGroup("end_effector", "right", 6),
     ), CAMERA_KEYS)
     policy_config = OpenPIConfig(
-        url=args.server, action_horizon=args.action_horizon,
-        broker=args.broker, control_hz=args.control_hz,
-        trigger_fraction=args.trigger_fraction, guidance_steps=args.guidance_steps,
+        url=inference["server"], action_horizon=inference["action_horizon"],
+        broker=inference["broker"], control_hz=inference["control_hz"],
+        trigger_fraction=inference["trigger_fraction"],
+        guidance_steps=inference["guidance_steps"],
     )
 
     with ExitStack() as stack:
@@ -429,11 +432,11 @@ def run(args) -> None:
                 name, controller, teleop, hands[name], home, settings
             )
 
-        if not args.skip_home:
+        if not inference["skip_home"]:
             for side in sides.values():
                 if side.request_home() is None:
                     raise RuntimeError(f"无法提交 {side.name} 初始姿态")
-            deadline = time.monotonic() + args.home_timeout
+            deadline = time.monotonic() + inference["home_timeout"]
             while any(control.mode == ControlMode.INIT for control in controllers.values()):
                 for control in controllers.values():
                     control.check_error()
@@ -449,11 +452,12 @@ def run(args) -> None:
             if not controller.set_mode(ControlMode.AUTO):
                 raise RuntimeError(f"{name} 无法切换到 AUTO 模式")
 
-        camera_deadline = time.monotonic() + args.camera_startup_timeout
+        camera_deadline = time.monotonic() + inference["camera_startup_timeout"]
         while True:
             try:
                 collector.snapshot(
-                    max_age=args.max_observation_age, max_skew=args.max_camera_skew,
+                    max_age=inference["max_observation_age"],
+                    max_skew=inference["max_camera_skew"],
                 )
                 break
             except TimeoutError:
@@ -461,7 +465,7 @@ def run(args) -> None:
                     raise
                 time.sleep(.02)
 
-        worker = InferenceWorker(policy, layout, controllers, collector, args)
+        worker = InferenceWorker(policy, layout, controllers, collector, inference)
         worker.start()
         stack.callback(worker.close)
         hand_limits = {name: hand.joint_limits for name, hand in hands.items()}
@@ -520,21 +524,10 @@ def main() -> None:
     faulthandler.enable(all_threads=True)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
-    parser.add_argument("--server", default="ws://192.168.2.15:8000")
-    parser.add_argument("--prompt", required=True)
-    parser.add_argument("--broker", choices=("serial", "rtg"), default="rtg")
-    parser.add_argument("--control-hz", type=float, default=15.)
-    parser.add_argument("--action-horizon", type=int, default=30)
-    parser.add_argument("--trigger-fraction", type=float, default=.5)
-    parser.add_argument("--guidance-steps", type=int, default=6)
-    parser.add_argument("--max-observation-age", type=float, default=.5)
-    parser.add_argument("--camera-startup-timeout", type=float, default=10.)
-    parser.add_argument("--max-camera-skew", type=float, default=.1)
-    parser.add_argument("--home-timeout", type=float, default=60.)
-    parser.add_argument("--skip-home", action="store_true", help="保持当前位置开始推理")
     args = parser.parse_args()
+    config = runpy.run_path(str(args.config.expanduser().resolve()))["CONFIG"]
     try:
-        run(args)
+        run(config)
     except KeyboardInterrupt:
         logger.info("系统已停止，机器人进入 HOLD 并关闭设备")
 
