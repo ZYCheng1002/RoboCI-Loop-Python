@@ -109,7 +109,7 @@ CONFIG = {
         "grip_threshold": 0.9,
         "hand_open_deg": [10, 10, 10, 10, 10, 10],
         "hand_closed_deg": [100, 175, 175, 175, 175, 45],
-        "hand_first_deg": [85, 70, 75, 175, 175, 25],
+        "hand_first_deg": [85, 70, 75, 75, 75, 25],
         "hand_axis_deadzone": 0.12,
         # [拇指旋转, 拇指屈曲] 的摇杆增量速度。
         "hand_thumb_speed_deg_s": [90, 90],

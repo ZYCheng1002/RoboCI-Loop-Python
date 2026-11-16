@@ -14,7 +14,7 @@ CONFIG = deepcopy(runpy.run_path(str(_BASE_CONFIG))["CONFIG"])
 CONFIG["inference"] = {
     "server": "ws://192.168.2.15:8000",
     "prompt": "Place the wire harness into the white tray, avoiding obstacles.",
-    "broker": "rtg",  # serial / rtg
+    "broker": "serial",  # serial / rtg
     "control_hz": 15.,
     "action_horizon": 30,
     "trigger_fraction": .5,
