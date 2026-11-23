@@ -87,7 +87,8 @@ input:focus,select:focus{{outline:2px solid #9bc4e3;outline-offset:1px;border-co
 <button id="rollback" onclick="rollback()">回退当前 Chunk</button>
 <span id="inference-state">未开始</span><span id="task-stats">成功率 —</span>
 <span id="inference-review" hidden><button onclick="reviewInference(true)">推理成功</button>
-<button class="stop" onclick="reviewInference(false)">推理失败</button></span>
+<button class="stop" onclick="reviewInference(false)">推理失败</button>
+<button onclick="reviewInference('ignored')">忽略</button></span>
 </div></section>
 <section id="point-panel" class="panel"><h2>采集参数 / Capture Setup</h2><div class="identity-fields">
 <label>Task <input id="task" type="text" value="" autocomplete="off" required maxlength="64" placeholder="例如：抓苹果"></label>

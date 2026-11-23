@@ -154,7 +154,7 @@ def run(config, output_dir, prefix):
                 for controller in controllers.values():
                     controller.set_mode(ControlMode.HOLD)
                 node.inference_state = 'awaiting_review'
-                return {'ok': True, 'message': '推理已结束，请人工提交成功或失败'}
+                return {'ok': True, 'message': '推理已结束，请人工提交成功、失败或忽略'}
 
         def abort_inference():
             with node.lock:
@@ -174,19 +174,23 @@ def run(config, output_dir, prefix):
                 node.rollback_requires_release = False
                 return {
                     'ok': True,
-                    'message': '推理已中断，请人工选择推理成功或失败；也可人工接管或回退当前 chunk',
+                    'message': '推理已中断，请人工选择推理成功、失败或忽略；也可人工接管或回退当前 chunk',
                 }
 
         def review_inference(success):
-            if type(success) is not bool:
-                raise ValueError('推理结果必须为成功或失败')
+            if type(success) is not bool and success != 'ignored':
+                raise ValueError('推理结果必须为成功、失败或忽略')
             with node.lock:
                 if node.inference_state != 'awaiting_review':
                     raise RuntimeError('当前没有待评价的推理')
-                node.inference_outcome = 'success' if success else 'failure'
-                node.save_inference_result(success)
+                if success == 'ignored':
+                    node.inference_outcome = 'ignored'
+                else:
+                    node.save_inference_result(success)
+                    node.inference_outcome = 'success' if success else 'failure'
                 node.inference_state = 'idle'
-                return {'ok': True, 'message': '推理结果已记为' + ('成功' if success else '失败')}
+                return {'ok': True, 'message': ('本轮推理已忽略，不计入统计' if success == 'ignored'
+                        else '推理结果已记为' + ('成功' if success else '失败'))}
 
         def request_home():
             with node.lock:
@@ -371,7 +375,7 @@ def run(config, output_dir, prefix):
                         if not controller.submit_inference(side_target):
                             raise RuntimeError(f'{name} 推理目标提交失败')
                         sides[name].publish_target(side_target)
-            elif intervened and not rollback_active:
+            elif state != 'running' and not rollback_active:
                 if node.rollback_requires_release:
                     if tracker is not None and not takeover_requested(
                             tracker, settings['grip_threshold']):
